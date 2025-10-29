@@ -869,6 +869,15 @@ def extraire_compte_resultat_par_libelles(chemin_pdf, table_cr):
 # FONCTIONS PRINCIPALES
 # ============================================
 
+# Dictionnaires inverses pour retrouver les codes à partir des libellés
+LIBELLE_TO_CODE_ACTIF = {v: k for k, v in CODES_BILAN_ACTIF.items()}
+LIBELLE_TO_CODE_PASSIF = {v: k for k, v in CODES_BILAN_PASSIF.items()}
+LIBELLE_TO_CODE_CR = {v: k for k, v in CODES_COMPTE_RESULTAT.items()}
+LIBELLE_TO_CODE_ECHEANCES_CREANCES = {v: k for k, v in CODES_ETAT_ECHEANCES_CREANCES.items()}
+LIBELLE_TO_CODE_ECHEANCES_DETTES = {v: k for k, v in CODES_ETAT_ECHEANCES_DETTES.items()}
+LIBELLE_TO_CODE_AFFECTATION = {v: k for k, v in CODES_AFFECTATION_RESULTAT.items()}
+LIBELLE_TO_CODE_RENSEIGNEMENTS = {v: k for k, v in CODES_RENSEIGNEMENTS_DIVERS.items()}
+
 def creer_fichier_excel(donnees_par_annee, nom_fichier):
     """Crée le fichier Excel avec UN SEUL onglet structuré par catégories.
     
@@ -895,10 +904,12 @@ def creer_fichier_excel(donnees_par_annee, nom_fichier):
     # En-têtes
     ws['A1'] = "Catégorie"
     ws['A1'].font = openpyxl.styles.Font(bold=True, size=12)
-    ws['B1'] = "Libellé"
+    ws['B1'] = "Code"
     ws['B1'].font = openpyxl.styles.Font(bold=True, size=12)
-    
-    for col_idx, annee in enumerate(annees_triees, start=3):
+    ws['C1'] = "Libellé"
+    ws['C1'].font = openpyxl.styles.Font(bold=True, size=12)
+
+    for col_idx, annee in enumerate(annees_triees, start=4):
         cell = ws.cell(row=1, column=col_idx)
         cell.value = annee
         cell.font = openpyxl.styles.Font(bold=True, size=12)
@@ -912,28 +923,30 @@ def creer_fichier_excel(donnees_par_annee, nom_fichier):
     if annees_triees:
         premiere_annee = annees_triees[0]
         donnees_actif = donnees_par_annee[premiere_annee].get('actif', [])
-        
+
         for libelle, _ in donnees_actif:
             ws[f'A{current_row}'] = "BILAN ACTIF"
-            ws[f'B{current_row}'] = libelle
-            
+            ws[f'B{current_row}'] = LIBELLE_TO_CODE_ACTIF.get(libelle, "")
+            ws[f'C{current_row}'] = libelle
+
             # Mettre en gras les TOTAUX
             if "TOTAL" in libelle.upper():
                 ws[f'A{current_row}'].font = openpyxl.styles.Font(bold=True)
                 ws[f'B{current_row}'].font = openpyxl.styles.Font(bold=True)
-            
+                ws[f'C{current_row}'].font = openpyxl.styles.Font(bold=True)
+
             # Remplir les montants pour chaque année
-            for col_idx, annee in enumerate(annees_triees, start=3):
+            for col_idx, annee in enumerate(annees_triees, start=4):
                 donnees_annee = donnees_par_annee[annee].get('actif', [])
                 montant = next((m for l, m in donnees_annee if l == libelle), 0)
-                
+
                 cell = ws.cell(row=current_row, column=col_idx)
                 cell.value = montant
                 cell.number_format = '#,##0.00'
-                
+
                 if "TOTAL" in libelle.upper():
                     cell.font = openpyxl.styles.Font(bold=True)
-            
+
             current_row += 1
     
     # Ligne vide entre sections
@@ -945,28 +958,30 @@ def creer_fichier_excel(donnees_par_annee, nom_fichier):
     if annees_triees:
         premiere_annee = annees_triees[0]
         donnees_passif = donnees_par_annee[premiere_annee].get('passif', [])
-        
+
         for libelle, _ in donnees_passif:
             ws[f'A{current_row}'] = "BILAN PASSIF"
-            ws[f'B{current_row}'] = libelle
-            
+            ws[f'B{current_row}'] = LIBELLE_TO_CODE_PASSIF.get(libelle, "")
+            ws[f'C{current_row}'] = libelle
+
             # Mettre en gras les TOTAUX
             if "TOTAL" in libelle.upper():
                 ws[f'A{current_row}'].font = openpyxl.styles.Font(bold=True)
                 ws[f'B{current_row}'].font = openpyxl.styles.Font(bold=True)
-            
+                ws[f'C{current_row}'].font = openpyxl.styles.Font(bold=True)
+
             # Remplir les montants pour chaque année
-            for col_idx, annee in enumerate(annees_triees, start=3):
+            for col_idx, annee in enumerate(annees_triees, start=4):
                 donnees_annee = donnees_par_annee[annee].get('passif', [])
                 montant = next((m for l, m in donnees_annee if l == libelle), 0)
-                
+
                 cell = ws.cell(row=current_row, column=col_idx)
                 cell.value = montant
                 cell.number_format = '#,##0.00'
-                
+
                 if "TOTAL" in libelle.upper():
                     cell.font = openpyxl.styles.Font(bold=True)
-            
+
             current_row += 1
     
     # Ligne vide entre sections
@@ -978,28 +993,30 @@ def creer_fichier_excel(donnees_par_annee, nom_fichier):
     if annees_triees:
         premiere_annee = annees_triees[0]
         donnees_cr = donnees_par_annee[premiere_annee].get('cr', [])
-        
+
         for libelle, _ in donnees_cr:
             ws[f'A{current_row}'] = "COMPTE RÉSULTAT"
-            ws[f'B{current_row}'] = libelle
-            
+            ws[f'B{current_row}'] = LIBELLE_TO_CODE_CR.get(libelle, "")
+            ws[f'C{current_row}'] = libelle
+
             # Mettre en gras les TOTAUX et RÉSULTATS
             if any(keyword in libelle.upper() for keyword in ["TOTAL", "RÉSULTAT", "CHIFFRE D'AFFAIRES", "BÉNÉFICE", "PERTE"]):
                 ws[f'A{current_row}'].font = openpyxl.styles.Font(bold=True)
                 ws[f'B{current_row}'].font = openpyxl.styles.Font(bold=True)
-            
+                ws[f'C{current_row}'].font = openpyxl.styles.Font(bold=True)
+
             # Remplir les montants pour chaque année
-            for col_idx, annee in enumerate(annees_triees, start=3):
+            for col_idx, annee in enumerate(annees_triees, start=4):
                 donnees_annee = donnees_par_annee[annee].get('cr', [])
                 montant = next((m for l, m in donnees_annee if l == libelle), 0)
-                
+
                 cell = ws.cell(row=current_row, column=col_idx)
                 cell.value = montant
                 cell.number_format = '#,##0.00'
-                
+
                 if any(keyword in libelle.upper() for keyword in ["TOTAL", "RÉSULTAT", "CHIFFRE D'AFFAIRES", "BÉNÉFICE", "PERTE"]):
                     cell.font = openpyxl.styles.Font(bold=True)
-            
+
             current_row += 1
     
     # Ligne vide entre sections
@@ -1011,20 +1028,23 @@ def creer_fichier_excel(donnees_par_annee, nom_fichier):
     if annees_triees:
         premiere_annee = annees_triees[0]
         donnees_echeances = donnees_par_annee[premiere_annee].get('echeances', [])
-        
+
         for libelle, _ in donnees_echeances:
             ws[f'A{current_row}'] = "ÉCHÉANCES"
-            ws[f'B{current_row}'] = libelle
-            
+            # Chercher le code dans les deux dictionnaires d'échéances
+            code = LIBELLE_TO_CODE_ECHEANCES_CREANCES.get(libelle) or LIBELLE_TO_CODE_ECHEANCES_DETTES.get(libelle, "")
+            ws[f'B{current_row}'] = code
+            ws[f'C{current_row}'] = libelle
+
             # Remplir les montants pour chaque année
-            for col_idx, annee in enumerate(annees_triees, start=3):
+            for col_idx, annee in enumerate(annees_triees, start=4):
                 donnees_annee = donnees_par_annee[annee].get('echeances', [])
                 montant = next((m for l, m in donnees_annee if l == libelle), 0)
-                
+
                 cell = ws.cell(row=current_row, column=col_idx)
                 cell.value = montant
                 cell.number_format = '#,##0.00'
-            
+
             current_row += 1
     
     # Ligne vide entre sections
@@ -1036,30 +1056,34 @@ def creer_fichier_excel(donnees_par_annee, nom_fichier):
     if annees_triees:
         premiere_annee = annees_triees[0]
         donnees_affectation = donnees_par_annee[premiere_annee].get('affectation', [])
-        
+
         for libelle, _ in donnees_affectation:
             ws[f'A{current_row}'] = "AFFECTATION"
-            ws[f'B{current_row}'] = libelle
-            
+            # Chercher le code dans les dictionnaires d'affectation et renseignements
+            code = LIBELLE_TO_CODE_AFFECTATION.get(libelle) or LIBELLE_TO_CODE_RENSEIGNEMENTS.get(libelle, "")
+            ws[f'B{current_row}'] = code
+            ws[f'C{current_row}'] = libelle
+
             # Remplir les montants pour chaque année
-            for col_idx, annee in enumerate(annees_triees, start=3):
+            for col_idx, annee in enumerate(annees_triees, start=4):
                 donnees_annee = donnees_par_annee[annee].get('affectation', [])
                 montant = next((m for l, m in donnees_annee if l == libelle), 0)
-                
+
                 cell = ws.cell(row=current_row, column=col_idx)
                 cell.value = montant
                 cell.number_format = '#,##0.00'
-            
+
             current_row += 1
     
     # Ajuster la largeur des colonnes
-    ws.column_dimensions['A'].width = 20
-    ws.column_dimensions['B'].width = 60
-    for col_idx in range(3, len(annees_triees) + 3):
+    ws.column_dimensions['A'].width = 20  # Catégorie
+    ws.column_dimensions['B'].width = 10  # Code
+    ws.column_dimensions['C'].width = 60  # Libellé
+    for col_idx in range(4, len(annees_triees) + 4):
         ws.column_dimensions[openpyxl.utils.get_column_letter(col_idx)].width = 15
-    
-    # Figer les en-têtes (ligne 1) et les colonnes Catégorie + Libellé
-    ws.freeze_panes = 'C2'
+
+    # Figer les en-têtes (ligne 1) et les colonnes Catégorie + Code + Libellé
+    ws.freeze_panes = 'D2'
     
     # ========================================
     # ONGLET 2: ANALYSE FINANCIÈRE
