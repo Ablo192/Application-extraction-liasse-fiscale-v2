@@ -1,0 +1,8 @@
+# Librairies pour l'extraction PDF
+pdfplumber>=0.9.0
+
+# Librairies pour Excel
+openpyxl>=3.1.0
+
+# Interface graphique (optionnel)
+streamlit>=1.28.0

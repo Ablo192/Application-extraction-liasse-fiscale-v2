@@ -2,7 +2,12 @@ import streamlit as st
 import tempfile
 import shutil
 from pathlib import Path
-from main import extraire_un_pdf, creer_fichier_excel
+
+# Import depuis les modules refactorisés
+from main import extraire_un_pdf
+from src.export.excel_generator import creer_fichier_excel
+from src.utils.pdf_utils import extraire_annee_fiscale
+import pdfplumber
 
 # Configuration de la page
 st.set_page_config(
@@ -44,19 +49,40 @@ if uploaded_files:
     
     # Créer un dictionnaire pour stocker les années
     fichiers_annees = {}
-    
+
     # Créer une colonne pour chaque fichier
     cols = st.columns(min(len(uploaded_files), 3))
-    
+
     for idx, uploaded_file in enumerate(uploaded_files):
         with cols[idx % 3]:
             st.markdown(f"**{uploaded_file.name}**")
+
+            # Tenter de détecter automatiquement l'année
+            annee_detectee = ""
+            try:
+                # Créer un fichier temporaire pour lire le PDF
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
+                    tmp_file.write(uploaded_file.getbuffer())
+                    tmp_path = tmp_file.name
+
+                # Extraire l'année
+                with pdfplumber.open(tmp_path) as pdf:
+                    annee_auto = extraire_annee_fiscale(pdf)
+                    if annee_auto:
+                        annee_detectee = annee_auto
+                        st.caption(f"🤖 Année détectée automatiquement : {annee_auto}")
+
+                # Supprimer le fichier temporaire
+                Path(tmp_path).unlink()
+            except Exception as e:
+                pass  # Silencieux si la détection échoue
+
             annee = st.text_input(
                 "Année",
-                value="",
+                value=annee_detectee,
                 key=f"annee_{idx}",
                 placeholder="Ex: 2023",
-                help="Indiquez l'année de cet exercice fiscal"
+                help="Année détectée automatiquement ou saisissez manuellement"
             )
             fichiers_annees[uploaded_file.name] = {
                 'file': uploaded_file,
@@ -202,7 +228,8 @@ else:
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: gray; padding: 20px;'>
-    <p>📊 Extraction Automatique de Liasses Fiscales v2.0</p>
-    <p>Onglet 1 : Données brutes • Onglet 2 : Analyse financière avec ratios automatiques</p>
+    <p>📊 Extraction Automatique de Liasses Fiscales v2.1 (Architecture Refactorisée)</p>
+    <p>✨ Nouvelles fonctionnalités : Détection automatique de l'année • Architecture modulaire</p>
+    <p>Onglet 1 : Données brutes • Onglet 2 : Analyse financière avec 43 ratios automatiques</p>
 </div>
 """, unsafe_allow_html=True)
