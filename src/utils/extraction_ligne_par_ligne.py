@@ -208,3 +208,52 @@ def extraire_cr_ligne_par_ligne(table, libelles_cr, debug=False):
 
     # Convertir en liste de tuples dans l'ordre des libellés
     return [(libelle, resultats_dict.get(libelle, 0)) for libelle in libelles_cr.keys()]
+
+
+def extraire_echeances_ligne_par_ligne(table, libelles_echeances, debug=False):
+    """Extrait l'État des Échéances ligne par ligne (1ère colonne).
+
+    Args:
+        table: Tableau extrait du PDF
+        libelles_echeances: Dict des libellés des échéances
+        debug: Mode debug
+
+    Returns:
+        list: Liste de tuples (libellé, montant)
+    """
+    print("\n📊 Extraction ÉCHÉANCES ligne par ligne (1ère colonne numérique)")
+
+    resultats_dict = extraire_par_libelles_ligne_par_ligne(
+        table,
+        libelles_echeances,
+        position_colonne=1,
+        debug=debug
+    )
+
+    # Convertir en liste de tuples dans l'ordre des libellés
+    return [(libelle, resultats_dict.get(libelle, 0)) for libelle in libelles_echeances.keys()]
+
+
+def extraire_affectation_ligne_par_ligne(table, libelles_affectation, debug=False):
+    """Extrait l'Affectation ligne par ligne (1ère colonne).
+
+    Args:
+        table: Tableau extrait du PDF
+        libelles_affectation: Dict des libellés de l'affectation
+        debug: Mode debug
+
+    Returns:
+        list: Liste de tuples (libellé, montant)
+    """
+    print("\n📊 Extraction AFFECTATION ligne par ligne (1ère colonne numérique)")
+
+    resultats_dict = extraire_par_libelles_ligne_par_ligne(
+        table,
+        libelles_affectation,
+        position_colonne=1,
+        debug=debug
+    )
+
+    # Convertir en liste de tuples dans l'ordre des libellés
+    return [(libelle, resultats_dict.get(libelle, 0)) for libelle in libelles_affectation.keys()]
+
