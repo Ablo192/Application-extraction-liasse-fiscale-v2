@@ -10,6 +10,11 @@ from src.config.codes_fiscaux import CODES_BILAN_PASSIF, SEUIL_REUSSITE_CODES_PA
 from src.config.mots_cles import MOTS_CLES_BILAN_PASSIF, LIBELLES_BILAN_PASSIF
 from src.utils.pdf_utils import obtenir_colonne_numerique, detecter_colonnes_numeriques
 from src.utils.text_processing import nettoyer_montant, normaliser_texte
+from src.utils.extraction_fallback import (
+    detecter_extraction_fusionnee,
+    extraire_codes_depuis_texte_fusionne,
+    extraire_montants_depuis_texte_fusionne
+)
 
 
 class BilanPassifExtractor(BaseExtractor):
@@ -25,6 +30,11 @@ class BilanPassifExtractor(BaseExtractor):
     def extraire_par_codes(self, pdf, table):
         """Extrait le Bilan Passif en cherchant les CODES dans le tableau.
 
+        Utilise une stratégie de fallback si l'extraction standard échoue:
+        1. Essaie l'extraction standard
+        2. Si échec, détecte si cellules fusionnées
+        3. Si fusionnées, parse le texte fusionné
+
         Args:
             pdf: Objet PDF (non utilisé ici)
             table: Tableau extrait du PDF
@@ -37,7 +47,29 @@ class BilanPassifExtractor(BaseExtractor):
             print("   ⚠️ Colonne 'Exercice N' introuvable.")
             return [], 0
 
+        # Tentative 1: Extraction standard
         codes_trouves, nb_trouves = self._extraire_codes_du_tableau(table, idx_passif_n)
+
+        # Si échec et extraction fusionnée, utiliser fallback
+        if nb_trouves == 0 and detecter_extraction_fusionnee(table):
+            print("   🔄 Extraction fusionnée détectée. Utilisation du parser de fallback...")
+            codes_info = extraire_codes_depuis_texte_fusionne(table, self.codes_dict)
+
+            if codes_info:
+                print(f"   ✅ {len(codes_info)} codes trouvés dans le texte fusionné")
+
+                # Extraire les montants correspondants
+                montants_texte = extraire_montants_depuis_texte_fusionne(codes_info, idx_passif_n)
+
+                # Convertir en format attendu
+                codes_trouves = {}
+                for code, montant_texte in montants_texte.items():
+                    montant = nettoyer_montant(montant_texte)
+                    codes_trouves[code] = montant if montant is not None else 0.0
+
+                nb_trouves = len([v for v in codes_trouves.values() if v != 0.0])
+                print(f"   ℹ️ Codes avec montants non-nuls: {nb_trouves}/{len(codes_trouves)}")
+
         resultats = self._convertir_en_resultats(codes_trouves)
 
         return resultats, nb_trouves

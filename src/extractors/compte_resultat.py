@@ -10,6 +10,11 @@ from src.config.codes_fiscaux import CODES_COMPTE_RESULTAT, SEUIL_REUSSITE_CODES
 from src.config.mots_cles import MOTS_CLES_COMPTE_RESULTAT
 from src.utils.pdf_utils import obtenir_colonne_numerique, detecter_colonnes_numeriques
 from src.utils.text_processing import nettoyer_montant
+from src.utils.extraction_fallback import (
+    detecter_extraction_fusionnee,
+    extraire_codes_depuis_texte_fusionne,
+    extraire_montants_depuis_texte_fusionne
+)
 
 
 class CompteResultatExtractor(BaseExtractor):
@@ -53,7 +58,21 @@ class CompteResultatExtractor(BaseExtractor):
                 idx_montant_page1 = self._trouver_colonne_page1(table_page1)
 
                 if idx_montant_page1 is not None:
-                    codes_page1, _ = self._extraire_codes_du_tableau(table_page1, idx_montant_page1)
+                    codes_page1, nb_page1 = self._extraire_codes_du_tableau(table_page1, idx_montant_page1)
+
+                    # Fallback si aucun code trouvé et extraction fusionnée
+                    if nb_page1 == 0 and detecter_extraction_fusionnee(table_page1):
+                        print("   🔄 [PAGE 1] Extraction fusionnée détectée. Utilisation du parser de fallback...")
+                        codes_info = extraire_codes_depuis_texte_fusionne(table_page1, self.codes_dict)
+
+                        if codes_info:
+                            print(f"   ✅ [PAGE 1] {len(codes_info)} codes trouvés dans le texte fusionné")
+                            montants_texte = extraire_montants_depuis_texte_fusionne(codes_info, idx_montant_page1)
+
+                            for code, montant_texte in montants_texte.items():
+                                montant = nettoyer_montant(montant_texte)
+                                codes_page1[code] = montant if montant is not None else 0.0
+
                     codes_trouves.update(codes_page1)
 
         # ========================================
@@ -69,7 +88,21 @@ class CompteResultatExtractor(BaseExtractor):
                 idx_montant_page2 = self._trouver_colonne_page2(table_page2)
 
                 if idx_montant_page2 is not None:
-                    codes_page2, _ = self._extraire_codes_du_tableau(table_page2, idx_montant_page2)
+                    codes_page2, nb_page2 = self._extraire_codes_du_tableau(table_page2, idx_montant_page2)
+
+                    # Fallback si aucun code trouvé et extraction fusionnée
+                    if nb_page2 == 0 and detecter_extraction_fusionnee(table_page2):
+                        print("   🔄 [PAGE 2] Extraction fusionnée détectée. Utilisation du parser de fallback...")
+                        codes_info = extraire_codes_depuis_texte_fusionne(table_page2, self.codes_dict)
+
+                        if codes_info:
+                            print(f"   ✅ [PAGE 2] {len(codes_info)} codes trouvés dans le texte fusionné")
+                            montants_texte = extraire_montants_depuis_texte_fusionne(codes_info, idx_montant_page2)
+
+                            for code, montant_texte in montants_texte.items():
+                                montant = nettoyer_montant(montant_texte)
+                                codes_page2[code] = montant if montant is not None else 0.0
+
                     codes_trouves.update(codes_page2)
 
         nb_trouves = len([v for v in codes_trouves.values() if v != 0.0])

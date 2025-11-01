@@ -14,6 +14,7 @@ from src.config.codes_fiscaux import (
 from src.config.mots_cles import MOTS_CLES_ETAT_ECHEANCES
 from src.utils.pdf_utils import detecter_section_dettes, obtenir_colonne_numerique, detecter_colonnes_numeriques
 from src.utils.text_processing import nettoyer_montant
+from src.utils.extraction_fallback import detecter_extraction_fusionnee
 
 
 class EtatEcheancesExtractor(BaseExtractor):
