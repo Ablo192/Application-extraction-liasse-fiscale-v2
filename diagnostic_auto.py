@@ -17,6 +17,10 @@ from src.utils.pdf_utils import (
     detecter_colonnes_numeriques,
     obtenir_colonne_numerique
 )
+from src.utils.extraction_fallback import (
+    detecter_extraction_fusionnee,
+    extraire_codes_depuis_texte_fusionne
+)
 from src.config.codes_fiscaux import (
     CODES_BILAN_ACTIF,
     CODES_BILAN_PASSIF,
@@ -54,12 +58,31 @@ def analyser_tableau(nom_formulaire, table, codes_attendus):
     print(f"   - Nombre de lignes: {len(table)}")
     print(f"   - Nombre de colonnes (max): {max(len(row) for row in table if row)}")
 
-    # 2. AFFICHER LES 10 PREMIÈRES LIGNES BRUTES
+    # 2. DÉTECTER SI L'EXTRACTION EST FUSIONNÉE
+    extraction_fusionnee = detecter_extraction_fusionnee(table)
+
+    if extraction_fusionnee:
+        print(f"\n🔴 PROBLÈME DÉTECTÉ: Extraction fusionnée!")
+        print(f"   pdfplumber a fusionné plusieurs lignes dans des cellules uniques.")
+        print(f"   Symptômes: cellules contenant 'DA\\nDL\\nDM\\n...' au lieu de cellules séparées.")
+        print(f"   Impact: Les codes ne seront pas trouvés correctement.")
+    else:
+        print(f"\n✅ Extraction propre: pas de fusion détectée")
+
+    # 3. AFFICHER LES 10 PREMIÈRES LIGNES BRUTES
     print(f"\n📋 Les 10 premières lignes du tableau brut:")
     for idx, row in enumerate(table[:10]):
-        print(f"   Ligne {idx}: {row}")
+        # Tronquer les cellules très longues pour la lisibilité
+        row_display = []
+        for cell in row:
+            if cell and len(str(cell)) > 100:
+                cell_preview = str(cell)[:100] + "... (tronqué)"
+                row_display.append(cell_preview)
+            else:
+                row_display.append(cell)
+        print(f"   Ligne {idx}: {row_display}")
 
-    # 3. DÉTECTION DES COLONNES NUMÉRIQUES
+    # 4. DÉTECTION DES COLONNES NUMÉRIQUES
     print(f"\n🔢 Détection des colonnes numériques:")
     colonnes_num = detecter_colonnes_numeriques(table, start_row=1, max_rows=20)
     print(f"   - Colonnes numériques détectées: {colonnes_num}")
@@ -71,7 +94,7 @@ def analyser_tableau(nom_formulaire, table, codes_attendus):
     else:
         print("   ⚠️ Aucune colonne numérique détectée!")
 
-    # 4. RECHERCHE DES CODES FISCAUX
+    # 5. RECHERCHE DES CODES FISCAUX
     print(f"\n🔍 Recherche des codes fiscaux attendus:")
     print(f"   - Codes attendus: {len(codes_attendus)} codes")
     print(f"   - Liste: {', '.join(list(codes_attendus.keys())[:10])}...")
@@ -97,7 +120,24 @@ def analyser_tableau(nom_formulaire, table, codes_attendus):
             print(f"        Position: ligne {row_idx}, colonne {col_idx}")
             print(f"        Ligne complète: {codes_trouves[code]}")
     else:
-        print(f"\n   ❌ AUCUN CODE TROUVÉ!")
+        print(f"\n   ❌ AUCUN CODE TROUVÉ avec la méthode standard!")
+
+        # Si l'extraction est fusionnée, essayer de parser le texte fusionné
+        if extraction_fusionnee:
+            print(f"\n   🔄 Tentative d'extraction depuis texte fusionné...")
+            codes_fusionnes = extraire_codes_depuis_texte_fusionne(table, codes_attendus)
+
+            if codes_fusionnes:
+                print(f"   ✅ {len(codes_fusionnes)} codes trouvés dans le texte fusionné!")
+                print(f"\n   📍 Détails (premiers 10):")
+                for code, info in list(codes_fusionnes.items())[:10]:
+                    libelle = codes_attendus[code]
+                    print(f"      - {code} ({libelle})")
+                    print(f"        Cellule fusionnée position: ligne {info['row_idx']}, colonne {info['col_idx']}")
+                    print(f"        Ligne {info['ligne_dans_cellule']} dans la cellule fusionnée")
+            else:
+                print(f"   ❌ Aucun code trouvé même dans le texte fusionné")
+
         print(f"\n   🔍 Analyse des cellules (20 premières lignes):")
 
         # Afficher toutes les cellules pour débugger
@@ -111,7 +151,7 @@ def analyser_tableau(nom_formulaire, table, codes_attendus):
 
         print(f"      Cellules courtes trouvées (≤4 caractères): {sorted(cellules_uniques)}")
 
-    # 5. ANALYSE COLONNE PAR COLONNE (en-tête)
+    # 6. ANALYSE COLONNE PAR COLONNE (en-tête)
     print(f"\n📑 Contenu des colonnes (ligne 0 - en-tête):")
     if table and len(table) > 0:
         for col_idx, cell in enumerate(table[0]):
