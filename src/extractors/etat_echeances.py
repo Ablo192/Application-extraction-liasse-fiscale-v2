@@ -14,7 +14,11 @@ from src.config.codes_fiscaux import (
 from src.config.mots_cles import MOTS_CLES_ETAT_ECHEANCES
 from src.utils.pdf_utils import detecter_section_dettes, obtenir_colonne_numerique, detecter_colonnes_numeriques
 from src.utils.text_processing import nettoyer_montant
-from src.utils.extraction_fallback import detecter_extraction_fusionnee
+from src.utils.extraction_fallback import (
+    detecter_extraction_fusionnee,
+    extraire_codes_depuis_texte_fusionne,
+    extraire_montants_depuis_texte_fusionne
+)
 
 
 class EtatEcheancesExtractor(BaseExtractor):
@@ -143,6 +147,41 @@ class EtatEcheancesExtractor(BaseExtractor):
                             print(f"   ⚠️  DETTES - {code} ({libelle}) → montant non trouvé [index {idx_col1}]")
 
         print(f"\n   📊 Total : {nb_trouves} valeur(s) trouvée(s)")
+
+        # Fallback si aucun code trouvé et extraction fusionnée
+        # Note: Version simplifiée utilisant idx_col1 pour tous les codes
+        if nb_trouves == 0 and detecter_extraction_fusionnee(table):
+            print("   🔄 Extraction fusionnée détectée. Utilisation du parser de fallback...")
+            codes_info = extraire_codes_depuis_texte_fusionne(table, self.codes_dict)
+
+            if codes_info:
+                print(f"   ✅ {len(codes_info)} codes trouvés dans le texte fusionné")
+
+                # Extraire les montants correspondants (utilise idx_col1 pour tout)
+                montants_texte = extraire_montants_depuis_texte_fusionne(codes_info, idx_col1)
+
+                # Réinitialiser les données
+                donnees = []
+                codes_trouves_dict = {}
+
+                for code, montant_texte in montants_texte.items():
+                    montant = nettoyer_montant(montant_texte)
+                    codes_trouves_dict[code] = montant if montant is not None else 0.0
+
+                # Construire la liste de résultats dans l'ordre des codes
+                for code in CODES_ETAT_ECHEANCES_CREANCES.keys():
+                    if code in codes_trouves_dict:
+                        libelle = CODES_ETAT_ECHEANCES_CREANCES[code]
+                        donnees.append((libelle, codes_trouves_dict[code]))
+
+                for code in CODES_ETAT_ECHEANCES_DETTES.keys():
+                    if code in codes_trouves_dict:
+                        libelle = CODES_ETAT_ECHEANCES_DETTES[code]
+                        donnees.append((libelle, codes_trouves_dict[code]))
+
+                nb_trouves = len([v for v in codes_trouves_dict.values() if v != 0.0])
+                print(f"   ℹ️ Codes avec montants non-nuls: {nb_trouves}/{len(codes_trouves_dict)}")
+
         return donnees, nb_trouves
 
     def extraire_par_libelles(self, pdf, table):

@@ -14,6 +14,11 @@ from src.config.codes_fiscaux import (
 from src.config.mots_cles import MOTS_CLES_AFFECTATION
 from src.utils.pdf_utils import obtenir_colonne_numerique, detecter_colonnes_numeriques
 from src.utils.text_processing import nettoyer_montant
+from src.utils.extraction_fallback import (
+    detecter_extraction_fusionnee,
+    extraire_codes_depuis_texte_fusionne,
+    extraire_montants_depuis_texte_fusionne
+)
 
 
 class AffectationExtractor(BaseExtractor):
@@ -96,6 +101,39 @@ class AffectationExtractor(BaseExtractor):
 
         total_codes = len(CODES_AFFECTATION_RESULTAT) + len(CODES_RENSEIGNEMENTS_DIVERS)
         print(f"   📊 Total : {nb_trouves} valeur(s) trouvée(s) sur {total_codes}")
+
+        # Fallback si aucun code trouvé et extraction fusionnée
+        if nb_trouves == 0 and detecter_extraction_fusionnee(table):
+            print("   🔄 Extraction fusionnée détectée. Utilisation du parser de fallback...")
+            codes_info = extraire_codes_depuis_texte_fusionne(table, self.codes_dict)
+
+            if codes_info:
+                print(f"   ✅ {len(codes_info)} codes trouvés dans le texte fusionné")
+
+                # Extraire les montants correspondants
+                montants_texte = extraire_montants_depuis_texte_fusionne(codes_info, idx_montant)
+
+                # Réinitialiser les données
+                donnees = []
+                codes_trouves_dict = {}
+
+                for code, montant_texte in montants_texte.items():
+                    montant = nettoyer_montant(montant_texte)
+                    codes_trouves_dict[code] = montant if montant is not None else 0.0
+
+                # Construire la liste de résultats dans l'ordre des codes
+                for code in CODES_AFFECTATION_RESULTAT.keys():
+                    libelle = CODES_AFFECTATION_RESULTAT[code]
+                    montant = codes_trouves_dict.get(code, 0)
+                    donnees.append((libelle, montant))
+
+                for code in CODES_RENSEIGNEMENTS_DIVERS.keys():
+                    libelle = CODES_RENSEIGNEMENTS_DIVERS[code]
+                    montant = codes_trouves_dict.get(code, 0)
+                    donnees.append((libelle, montant))
+
+                nb_trouves = len([v for v in codes_trouves_dict.values() if v != 0.0])
+                print(f"   ℹ️ Codes avec montants non-nuls: {nb_trouves}/{len(codes_trouves_dict)}")
 
         return donnees, nb_trouves
 

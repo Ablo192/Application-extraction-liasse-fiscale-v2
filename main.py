@@ -47,83 +47,137 @@ def extraire_un_pdf(chemin_pdf):
             if annee:
                 print(f"📅 Année fiscale détectée : {annee}\n")
 
-            # --- ÉTAPE 1 : TROUVER LA PAGE DE L'ACTIF ---
+            # ============================================================
+            # TRAITEMENT SÉQUENTIEL: BILAN ACTIF
+            # ============================================================
+            print("\n" + "="*80)
+            print("📋 BILAN ACTIF (Formulaire 2050)")
+            print("="*80)
+
             print("🔍 Recherche de la page du Bilan Actif...")
             actif_page_index = trouver_page_contenant(pdf, ["Brut", "Net", "ACTIF"])
 
             if actif_page_index == -1:
-                print("❌ Impossible de trouver la page du Bilan Actif.")
-                return None
+                print("❌ Page non trouvée. Passage au formulaire suivant.")
+                donnees_actif = []
+            else:
+                print(f"   ✓ Page identifiée : {actif_page_index + 1}")
 
-            print(f"   ✓ Bilan Actif identifié sur la page {actif_page_index + 1}.")
+                print("📊 Extraction du tableau...")
+                tables_actif = pdf.pages[actif_page_index].extract_tables()
+                if not tables_actif:
+                    print("❌ Aucun tableau trouvé.")
+                    donnees_actif = []
+                else:
+                    table_actif = tables_actif[0]
+                    print("   ✓ Tableau extrait")
 
-            # --- ÉTAPE 2 : TROUVER LA PAGE DU PASSIF ---
+                    print("🚀 Traitement des données...")
+                    actif_extractor = BilanActifExtractor()
+                    donnees_actif = actif_extractor.extraire(pdf, table_actif)
+                    print(f"✅ Actif terminé: {len(donnees_actif)} lignes extraites")
+
+            # ============================================================
+            # TRAITEMENT SÉQUENTIEL: BILAN PASSIF
+            # ============================================================
+            print("\n" + "="*80)
+            print("📋 BILAN PASSIF (Formulaire 2051)")
+            print("="*80)
+
             print("🔍 Recherche de la page du Bilan Passif...")
             passif_page_index = trouver_page_contenant(pdf, ["Capital social ou individuel", "PASSIF"])
 
             if passif_page_index == -1:
-                print("❌ Impossible de trouver la page du Bilan Passif.")
-                return None
+                print("❌ Page non trouvée. Passage au formulaire suivant.")
+                donnees_passif = []
+            else:
+                print(f"   ✓ Page identifiée : {passif_page_index + 1}")
 
-            print(f"   ✓ Bilan Passif identifié sur la page {passif_page_index + 1}.")
+                print("📊 Extraction du tableau...")
+                tables_passif = pdf.pages[passif_page_index].extract_tables()
+                if not tables_passif:
+                    print("❌ Aucun tableau trouvé.")
+                    donnees_passif = []
+                else:
+                    table_passif = tables_passif[0]
+                    print("   ✓ Tableau extrait")
 
-            # --- ÉTAPE 3 : EXTRAIRE LES TABLEAUX ---
-            print("\n📊 Extraction des tableaux...")
+                    print("🚀 Traitement des données...")
+                    passif_extractor = BilanPassifExtractor()
+                    donnees_passif = passif_extractor.extraire(pdf, table_passif)
+                    print(f"✅ Passif terminé: {len(donnees_passif)} lignes extraites")
 
-            tables_actif = pdf.pages[actif_page_index].extract_tables()
-            if not tables_actif:
-                print(f"❌ Aucun tableau trouvé sur la page de l'Actif.")
-                return None
-            table_actif = tables_actif[0]
-            print(f"   ✓ Tableau Actif extrait.")
+            # ============================================================
+            # TRAITEMENT SÉQUENTIEL: COMPTE DE RÉSULTAT
+            # ============================================================
+            print("\n" + "="*80)
+            print("📋 COMPTE DE RÉSULTAT (Formulaires 2052-2053)")
+            print("="*80)
 
-            tables_passif = pdf.pages[passif_page_index].extract_tables()
-            if not tables_passif:
-                print(f"❌ Aucun tableau trouvé sur la page du Passif.")
-                return None
-            table_passif = tables_passif[0]
-            print(f"   ✓ Tableau Passif extrait.")
-
-            # --- ÉTAPE 4 : EXTRACTION DES DONNÉES AVEC LES EXTRACTEURS ---
-
-            # Extraction Actif
-            print("\n--- 🚀 EXTRACTION DU BILAN ACTIF ---")
-            actif_extractor = BilanActifExtractor()
-            donnees_actif = actif_extractor.extraire(pdf, table_actif)
-
-            # Extraction Passif
-            print("\n--- 🚀 EXTRACTION DU BILAN PASSIF ---")
-            passif_extractor = BilanPassifExtractor()
-            donnees_passif = passif_extractor.extraire(pdf, table_passif)
-
-            # Extraction Compte de Résultat
-            print("\n--- 🚀 EXTRACTION DU COMPTE DE RÉSULTAT ---")
+            print("🚀 Traitement des données (2 pages)...")
             cr_extractor = CompteResultatExtractor()
             donnees_cr = cr_extractor.extraire(pdf, None)
+            print(f"✅ Compte de Résultat terminé: {len(donnees_cr)} lignes extraites")
 
-            # Extraction État des échéances
-            print("\n--- 🚀 EXTRACTION DE L'ÉTAT DES ÉCHÉANCES ---")
+            # ============================================================
+            # TRAITEMENT SÉQUENTIEL: ÉTAT DES ÉCHÉANCES
+            # ============================================================
+            print("\n" + "="*80)
+            print("📋 ÉTAT DES ÉCHÉANCES (Formulaire 2057)")
+            print("="*80)
+
+            print("🔍 Recherche de la page de l'État des Échéances...")
             echeances_page_index = trouver_page_contenant(pdf, ["ÉTAT DES ÉCHÉANCES", "ETAT DES ECHEANCES"])
-            if echeances_page_index != -1:
-                tables_echeances = pdf.pages[echeances_page_index].extract_tables()
-                table_echeances = tables_echeances[0] if tables_echeances else []
-                echeances_extractor = EtatEcheancesExtractor()
-                donnees_echeances = echeances_extractor.extraire(pdf, table_echeances)
-            else:
-                print("⚠️ Page État des échéances non trouvée")
-                donnees_echeances = []
 
-            # Extraction Affectation du résultat
-            print("\n--- 🚀 EXTRACTION DE L'AFFECTATION DU RÉSULTAT ---")
-            affectation_page_index = trouver_page_contenant(pdf, ["AFFECTATION DU RÉSULTAT", "RENSEIGNEMENTS DIVERS"])
-            if affectation_page_index != -1:
-                tables_affectation = pdf.pages[affectation_page_index].extract_tables()
-                table_affectation = tables_affectation[0] if tables_affectation else []
-                affectation_extractor = AffectationExtractor()
-                donnees_affectation = affectation_extractor.extraire(pdf, table_affectation)
+            if echeances_page_index == -1:
+                print("❌ Page non trouvée. Passage au formulaire suivant.")
+                donnees_echeances = []
             else:
-                print("⚠️ Page Affectation du résultat non trouvée")
+                print(f"   ✓ Page identifiée : {echeances_page_index + 1}")
+
+                print("📊 Extraction du tableau...")
+                tables_echeances = pdf.pages[echeances_page_index].extract_tables()
+                if not tables_echeances:
+                    print("❌ Aucun tableau trouvé.")
+                    donnees_echeances = []
+                else:
+                    table_echeances = tables_echeances[0]
+                    print("   ✓ Tableau extrait")
+
+                    print("🚀 Traitement des données...")
+                    echeances_extractor = EtatEcheancesExtractor()
+                    donnees_echeances = echeances_extractor.extraire(pdf, table_echeances)
+                    print(f"✅ Échéances terminé: {len(donnees_echeances)} lignes extraites")
+
+            # ============================================================
+            # TRAITEMENT SÉQUENTIEL: AFFECTATION DU RÉSULTAT
+            # ============================================================
+            print("\n" + "="*80)
+            print("📋 AFFECTATION DU RÉSULTAT (Formulaire 2058-C)")
+            print("="*80)
+
+            print("🔍 Recherche de la page de l'Affectation...")
+            affectation_page_index = trouver_page_contenant(pdf, ["AFFECTATION DU RÉSULTAT", "RENSEIGNEMENTS DIVERS"])
+
+            if affectation_page_index == -1:
+                print("❌ Page non trouvée. Passage au formulaire suivant.")
                 donnees_affectation = []
+            else:
+                print(f"   ✓ Page identifiée : {affectation_page_index + 1}")
+
+                print("📊 Extraction du tableau...")
+                tables_affectation = pdf.pages[affectation_page_index].extract_tables()
+                if not tables_affectation:
+                    print("❌ Aucun tableau trouvé.")
+                    donnees_affectation = []
+                else:
+                    table_affectation = tables_affectation[0]
+                    print("   ✓ Tableau extrait")
+
+                    print("🚀 Traitement des données...")
+                    affectation_extractor = AffectationExtractor()
+                    donnees_affectation = affectation_extractor.extraire(pdf, table_affectation)
+                    print(f"✅ Affectation terminé: {len(donnees_affectation)} lignes extraites")
 
             return {
                 'actif': donnees_actif,
