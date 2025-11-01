@@ -8,7 +8,7 @@ de liasses fiscales. Le compte de résultat s'étend sur 2 pages.
 from src.extractors.base import BaseExtractor
 from src.config.codes_fiscaux import CODES_COMPTE_RESULTAT, SEUIL_REUSSITE_CODES_COMPTE_RESULTAT
 from src.config.mots_cles import MOTS_CLES_COMPTE_RESULTAT
-from src.utils.pdf_utils import trouver_colonne_montant
+from src.utils.pdf_utils import obtenir_colonne_numerique, detecter_colonnes_numeriques
 from src.utils.text_processing import nettoyer_montant
 
 
@@ -118,42 +118,37 @@ class CompteResultatExtractor(BaseExtractor):
     def _trouver_colonne_page1(self, table):
         """Trouve l'index de la colonne avec les montants dans la PAGE 1.
 
-        Logique GPS pour PAGE 1 :
-        1. Cherche "TOTAL" dans l'en-tête
-        2. Les montants sont à index TOTAL + 1
+        Logique intelligente : Compte les colonnes numériques et prend la 1ère.
         """
-        # Chercher "TOTAL" dans les premières lignes
-        idx_total = None
-        for row in table[:5]:
-            for idx, cell in enumerate(row):
-                if cell and "TOTAL" in str(cell).strip().upper():
-                    idx_total = idx
-                    print(f"   ℹ️ [PAGE 1] 'TOTAL' trouvé à l'index {idx}")
-                    break
-            if idx_total is not None:
-                break
+        # Détecter toutes les colonnes numériques
+        colonnes_num = detecter_colonnes_numeriques(table, start_row=1, max_rows=20)
+        print(f"   🔍 [PAGE 1] Colonnes numériques détectées : {colonnes_num}")
 
-        # Déduire l'index des montants
-        if idx_total is not None:
-            idx_montants = idx_total + 1
-            print(f"   ✓ [PAGE 1] Colonne des montants déduite : index {idx_montants}")
-            return idx_montants
+        # Prendre la 1ère colonne numérique
+        idx_montants = obtenir_colonne_numerique(table, position=1, start_row=1, max_rows=20)
+
+        if idx_montants is not None:
+            print(f"   ✓ [PAGE 1] Colonne des montants (1ère colonne numérique) : index {idx_montants}")
         else:
-            print("   ⚠️ [PAGE 1] Impossible de trouver 'TOTAL'")
-            return None
+            print("   ⚠️ [PAGE 1] Impossible de trouver la 1ère colonne numérique")
+
+        return idx_montants
 
     def _trouver_colonne_page2(self, table):
         """Trouve l'index de la colonne avec les montants dans la PAGE 2.
 
-        Logique GPS pour PAGE 2 :
-        1. Cherche "Exercice N"
-        2. Les montants sont à index Exercice N + 1
+        Logique intelligente : Compte les colonnes numériques et prend la 1ère.
         """
-        idx_exercice_n = trouver_colonne_montant(table, "Exercice N", offset=1, max_rows=10)
+        # Détecter toutes les colonnes numériques
+        colonnes_num = detecter_colonnes_numeriques(table, start_row=1, max_rows=20)
+        print(f"   🔍 [PAGE 2] Colonnes numériques détectées : {colonnes_num}")
 
-        if idx_exercice_n:
-            print(f"   ✓ [PAGE 2] Colonne des montants déduite : index {idx_exercice_n}")
-            return idx_exercice_n
+        # Prendre la 1ère colonne numérique
+        idx_montants = obtenir_colonne_numerique(table, position=1, start_row=1, max_rows=20)
+
+        if idx_montants is not None:
+            print(f"   ✓ [PAGE 2] Colonne des montants (1ère colonne numérique) : index {idx_montants}")
         else:
-            print("   ⚠️ [PAGE 2] Impossible de trouver 'Exercice N'")
-            return None
+            print("   ⚠️ [PAGE 2] Impossible de trouver la 1ère colonne numérique")
+
+        return idx_montants

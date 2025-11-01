@@ -8,7 +8,7 @@ de liasses fiscales.
 from src.extractors.base import BaseExtractor
 from src.config.codes_fiscaux import CODES_BILAN_ACTIF, SEUIL_REUSSITE_CODES_ACTIF
 from src.config.mots_cles import MOTS_CLES_BILAN_ACTIF, LIBELLES_BILAN_ACTIF
-from src.utils.pdf_utils import trouver_colonne_montant
+from src.utils.pdf_utils import obtenir_colonne_numerique, detecter_colonnes_numeriques
 from src.utils.text_processing import nettoyer_montant, normaliser_texte
 
 
@@ -83,10 +83,26 @@ class BilanActifExtractor(BaseExtractor):
     def _trouver_colonne_net(self, table):
         """Trouve l'index de la colonne 'Net' dans le tableau de l'actif.
 
+        Logique intelligente : Compte les colonnes numériques et prend la 3ème.
+        Typiquement : Brut (1ère), Amortissement (2ème), Net (3ème)
+
         Args:
             table: Tableau extrait du PDF
 
         Returns:
             int: Index de la colonne 'Net' ou None si non trouvée
         """
-        return trouver_colonne_montant(table, "Net", offset=0, max_rows=5)
+        # Détecter toutes les colonnes numériques (en commençant après l'en-tête)
+        colonnes_num = detecter_colonnes_numeriques(table, start_row=1, max_rows=20)
+
+        print(f"   🔍 Colonnes numériques détectées pour Bilan Actif : {colonnes_num}")
+
+        # Prendre la 3ème colonne numérique
+        idx_net = obtenir_colonne_numerique(table, position=3, start_row=1, max_rows=20)
+
+        if idx_net is not None:
+            print(f"   ✓ Colonne 'Net' (3ème colonne numérique) : index {idx_net}")
+        else:
+            print(f"   ⚠️ Impossible de trouver la 3ème colonne numérique")
+
+        return idx_net

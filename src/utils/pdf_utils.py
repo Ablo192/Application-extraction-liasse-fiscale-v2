@@ -8,6 +8,106 @@ des structures dans les PDFs de liasses fiscales.
 import re
 
 
+def detecter_colonnes_numeriques(table, start_row=0, max_rows=20):
+    """Détecte intelligemment les colonnes qui contiennent des valeurs numériques.
+
+    Analyse les lignes du tableau pour identifier quelles colonnes contiennent
+    principalement des nombres (montants, années, etc.).
+
+    Args:
+        table: Tableau extrait du PDF (liste de listes)
+        start_row: Ligne de départ (pour éviter les en-têtes, défaut: 0)
+        max_rows: Nombre maximum de lignes à analyser (défaut: 20)
+
+    Returns:
+        list: Liste des indices de colonnes numériques, triée par ordre croissant
+
+    Examples:
+        >>> table = [
+        ...     ["Libellé", "Code", "Brut", "Amort", "Net"],
+        ...     ["Capital", "DA", "100000", "0", "100000"],
+        ...     ["Réserves", "DD", "50000", "0", "50000"]
+        ... ]
+        >>> detecter_colonnes_numeriques(table, start_row=1)
+        [2, 3, 4]  # Colonnes Brut, Amort, Net
+    """
+    if not table or len(table) <= start_row:
+        return []
+
+    # Déterminer le nombre de colonnes
+    nb_colonnes = max(len(row) for row in table if row)
+    if nb_colonnes == 0:
+        return []
+
+    # Compteur de valeurs numériques par colonne
+    colonnes_scores = [0] * nb_colonnes
+    lignes_analysees = 0
+
+    # Analyser les lignes
+    for row_idx in range(start_row, min(len(table), start_row + max_rows)):
+        row = table[row_idx]
+        if not row:
+            continue
+
+        lignes_analysees += 1
+
+        for col_idx, cell in enumerate(row):
+            if col_idx >= nb_colonnes:
+                break
+
+            if not cell:
+                continue
+
+            # Vérifier si la cellule contient un nombre
+            cell_text = str(cell).strip()
+
+            # Nettoyer et tester si c'est un nombre
+            # Accepter : "1000", "1 000", "1.000", "1,000", "(1000)", "-1000", etc.
+            cell_clean = cell_text.replace(' ', '').replace(',', '.').replace('(', '-').replace(')', '')
+
+            # Tester si c'est un nombre
+            try:
+                float(cell_clean)
+                colonnes_scores[col_idx] += 1
+            except ValueError:
+                # Pas un nombre
+                pass
+
+    # Identifier les colonnes numériques
+    # Une colonne est considérée numérique si au moins 30% des cellules sont des nombres
+    seuil = max(1, int(lignes_analysees * 0.3))
+    colonnes_numeriques = [idx for idx, score in enumerate(colonnes_scores) if score >= seuil]
+
+    return colonnes_numeriques
+
+
+def obtenir_colonne_numerique(table, position, start_row=0, max_rows=20):
+    """Obtient l'index de la Nème colonne numérique du tableau.
+
+    Args:
+        table: Tableau extrait du PDF
+        position: Position de la colonne numérique souhaitée (1 = première, 2 = deuxième, etc.)
+        start_row: Ligne de départ pour l'analyse
+        max_rows: Nombre maximum de lignes à analyser
+
+    Returns:
+        int: Index de la colonne, ou None si pas trouvée
+
+    Examples:
+        >>> table = [["Libellé", "Code", "Montant1", "Montant2"], ...]
+        >>> obtenir_colonne_numerique(table, 1)  # Première colonne numérique
+        2
+        >>> obtenir_colonne_numerique(table, 2)  # Deuxième colonne numérique
+        3
+    """
+    colonnes = detecter_colonnes_numeriques(table, start_row, max_rows)
+
+    if not colonnes or position < 1 or position > len(colonnes):
+        return None
+
+    return colonnes[position - 1]  # position est 1-based, liste est 0-based
+
+
 def extraire_annee_fiscale(pdf):
     """Extrait l'année fiscale depuis le PDF.
 

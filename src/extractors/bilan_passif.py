@@ -8,7 +8,7 @@ de liasses fiscales.
 from src.extractors.base import BaseExtractor
 from src.config.codes_fiscaux import CODES_BILAN_PASSIF, SEUIL_REUSSITE_CODES_PASSIF
 from src.config.mots_cles import MOTS_CLES_BILAN_PASSIF, LIBELLES_BILAN_PASSIF
-from src.utils.pdf_utils import trouver_colonne_montant
+from src.utils.pdf_utils import obtenir_colonne_numerique, detecter_colonnes_numeriques
 from src.utils.text_processing import nettoyer_montant, normaliser_texte
 
 
@@ -83,7 +83,7 @@ class BilanPassifExtractor(BaseExtractor):
     def _trouver_colonne_passif_n(self, table):
         """Trouve l'index de la colonne 'Exercice N' dans le tableau du passif.
 
-        Les montants sont décalés de +1 par rapport à l'en-tête 'Exercice N'.
+        Logique intelligente : Compte les colonnes numériques et prend la 1ère.
 
         Args:
             table: Tableau extrait du PDF
@@ -91,12 +91,17 @@ class BilanPassifExtractor(BaseExtractor):
         Returns:
             int: Index de la colonne des montants ou None si non trouvée
         """
-        print("🔍 Recherche de la colonne 'Exercice N' pour le Passif...")
-        idx_montant = trouver_colonne_montant(table, "Exercice N", offset=1, max_rows=10)
+        # Détecter toutes les colonnes numériques (en commençant après l'en-tête)
+        colonnes_num = detecter_colonnes_numeriques(table, start_row=1, max_rows=20)
 
-        if idx_montant:
-            print(f"   ✓ Colonne des montants trouvée à l'index : {idx_montant}\n")
+        print(f"   🔍 Colonnes numériques détectées pour Bilan Passif : {colonnes_num}")
+
+        # Prendre la 1ère colonne numérique
+        idx_montant = obtenir_colonne_numerique(table, position=1, start_row=1, max_rows=20)
+
+        if idx_montant is not None:
+            print(f"   ✓ Colonne 'Exercice N' (1ère colonne numérique) : index {idx_montant}")
         else:
-            print("❌ En-tête 'Exercice N' non trouvé.")
+            print(f"   ⚠️ Impossible de trouver la 1ère colonne numérique")
 
         return idx_montant

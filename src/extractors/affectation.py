@@ -12,6 +12,7 @@ from src.config.codes_fiscaux import (
     SEUIL_REUSSITE_CODES_AFFECTATION_RESULTAT
 )
 from src.config.mots_cles import MOTS_CLES_AFFECTATION
+from src.utils.pdf_utils import obtenir_colonne_numerique, detecter_colonnes_numeriques
 from src.utils.text_processing import nettoyer_montant
 
 
@@ -31,9 +32,7 @@ class AffectationExtractor(BaseExtractor):
     def extraire_par_codes(self, pdf, table):
         """Extrait l'Affectation du résultat et Renseignements divers par codes.
 
-        Structure:
-        - AFFECTATION: code ZE à l'index 26
-        - RENSEIGNEMENTS DIVERS: codes YQ, YR, YT, YU à l'index 18
+        Logique intelligente : Utilise la 1ère colonne numérique pour tous les montants.
 
         Args:
             pdf: Objet PDF (non utilisé ici)
@@ -43,6 +42,18 @@ class AffectationExtractor(BaseExtractor):
             tuple: (liste de tuples (libellé, montant), nombre de valeurs trouvées)
         """
         print("📊 Extraction par CODES de l'Affectation du résultat et Renseignements divers...")
+
+        # Détecter la 1ère colonne numérique
+        colonnes_num = detecter_colonnes_numeriques(table, start_row=1, max_rows=20)
+        print(f"   🔍 Colonnes numériques détectées pour Affectation : {colonnes_num}")
+
+        idx_montant = obtenir_colonne_numerique(table, position=1, start_row=1, max_rows=20)
+
+        if idx_montant is None:
+            print("   ⚠️ Impossible de trouver la 1ère colonne numérique")
+            return [], 0
+
+        print(f"   ✓ Colonne des montants (1ère colonne numérique) : index {idx_montant}")
 
         donnees = []
         nb_trouves = 0
@@ -55,33 +66,33 @@ class AffectationExtractor(BaseExtractor):
 
                 code = str(cell).strip().upper()
 
-                # AFFECTATION DU RÉSULTAT - Code ZE (Dividendes) → index 26
+                # AFFECTATION DU RÉSULTAT - Code ZE (Dividendes)
                 if code == "ZE" and code in CODES_AFFECTATION_RESULTAT:
                     libelle = CODES_AFFECTATION_RESULTAT[code]
-                    montant_cell = row[26] if len(row) > 26 else None
+                    montant_cell = row[idx_montant] if idx_montant < len(row) else None
                     montant = nettoyer_montant(montant_cell)
 
                     if montant is not None:
                         donnees.append((libelle, montant))
                         nb_trouves += 1
-                        print(f"   ✓ {code} ({libelle}) → {montant} [index 26]")
+                        print(f"   ✓ {code} ({libelle}) → {montant} [index {idx_montant}]")
                     else:
                         donnees.append((libelle, 0))
-                        print(f"   ⚠️  {code} ({libelle}) → montant non trouvé [index 26]")
+                        print(f"   ⚠️  {code} ({libelle}) → montant non trouvé [index {idx_montant}]")
 
-                # RENSEIGNEMENTS DIVERS - Codes YQ, YR, YT, YU → index 18
+                # RENSEIGNEMENTS DIVERS - Codes YQ, YR, YT, YU
                 elif code in CODES_RENSEIGNEMENTS_DIVERS:
                     libelle = CODES_RENSEIGNEMENTS_DIVERS[code]
-                    montant_cell = row[18] if len(row) > 18 else None
+                    montant_cell = row[idx_montant] if idx_montant < len(row) else None
                     montant = nettoyer_montant(montant_cell)
 
                     if montant is not None:
                         donnees.append((libelle, montant))
                         nb_trouves += 1
-                        print(f"   ✓ {code} ({libelle}) → {montant} [index 18]")
+                        print(f"   ✓ {code} ({libelle}) → {montant} [index {idx_montant}]")
                     else:
                         donnees.append((libelle, 0))
-                        print(f"   ⚠️  {code} ({libelle}) → montant non trouvé [index 18]")
+                        print(f"   ⚠️  {code} ({libelle}) → montant non trouvé [index {idx_montant}]")
 
         total_codes = len(CODES_AFFECTATION_RESULTAT) + len(CODES_RENSEIGNEMENTS_DIVERS)
         print(f"   📊 Total : {nb_trouves} valeur(s) trouvée(s) sur {total_codes}")

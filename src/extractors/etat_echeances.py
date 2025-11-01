@@ -12,7 +12,7 @@ from src.config.codes_fiscaux import (
     SEUIL_REUSSITE_CODES_ETAT_ECHEANCES
 )
 from src.config.mots_cles import MOTS_CLES_ETAT_ECHEANCES
-from src.utils.pdf_utils import detecter_section_dettes
+from src.utils.pdf_utils import detecter_section_dettes, obtenir_colonne_numerique, detecter_colonnes_numeriques
 from src.utils.text_processing import nettoyer_montant
 
 
@@ -32,9 +32,10 @@ class EtatEcheancesExtractor(BaseExtractor):
     def extraire_par_codes(self, pdf, table):
         """Extrait l'État des échéances en utilisant les codes officiels.
 
-        Structure:
-        - CRÉANCES: codes VA, VC à l'index 13
-        - DETTES: code VH à l'index 14, code VI à l'index 10
+        Logique intelligente :
+        - CRÉANCES (VA, VC): 1ère colonne numérique
+        - DETTES VH (Annuité à venir): 2ème colonne numérique
+        - DETTES VI (Groupe et associés): 1ère colonne numérique
 
         Args:
             pdf: Objet PDF (non utilisé ici)
@@ -44,6 +45,25 @@ class EtatEcheancesExtractor(BaseExtractor):
             tuple: (liste de tuples (libellé, montant), nombre de valeurs trouvées)
         """
         print("📊 Extraction par CODES de l'État des échéances...")
+
+        # Détecter les colonnes numériques
+        colonnes_num = detecter_colonnes_numeriques(table, start_row=1, max_rows=20)
+        print(f"   🔍 Colonnes numériques détectées pour État des Échéances : {colonnes_num}")
+
+        # Obtenir la 1ère et 2ème colonne numérique
+        idx_col1 = obtenir_colonne_numerique(table, position=1, start_row=1, max_rows=20)
+        idx_col2 = obtenir_colonne_numerique(table, position=2, start_row=1, max_rows=20)
+
+        if idx_col1 is None:
+            print("   ⚠️ Impossible de trouver la 1ère colonne numérique")
+            return [], 0
+
+        print(f"   ✓ 1ère colonne numérique : index {idx_col1}")
+        if idx_col2 is not None:
+            print(f"   ✓ 2ème colonne numérique : index {idx_col2}")
+        else:
+            print(f"   ⚠️ 2ème colonne numérique non trouvée (utilisera la 1ère par défaut)")
+            idx_col2 = idx_col1
 
         donnees = []
         nb_trouves = 0
@@ -69,23 +89,23 @@ class EtatEcheancesExtractor(BaseExtractor):
 
                 code = str(cell).strip().upper()
 
-                # SECTION CRÉANCES
+                # SECTION CRÉANCES (VA, VC) → 1ère colonne numérique
                 if not dans_section_dettes and code in CODES_ETAT_ECHEANCES_CREANCES:
                     if code in codes_trouves_creances:
                         continue
                     codes_trouves_creances.add(code)
 
                     libelle = CODES_ETAT_ECHEANCES_CREANCES[code]
-                    montant_cell = row[13] if len(row) > 13 else None
+                    montant_cell = row[idx_col1] if idx_col1 < len(row) else None
                     montant = nettoyer_montant(montant_cell)
 
                     if montant is not None:
                         donnees.append((libelle, montant))
                         nb_trouves += 1
-                        print(f"   ✓ CRÉANCES - {code} ({libelle}) → {montant} [index 13]")
+                        print(f"   ✓ CRÉANCES - {code} ({libelle}) → {montant} [index {idx_col1}]")
                     else:
                         donnees.append((libelle, 0))
-                        print(f"   ⚠️  CRÉANCES - {code} ({libelle}) → montant non trouvé [index 13]")
+                        print(f"   ⚠️  CRÉANCES - {code} ({libelle}) → montant non trouvé [index {idx_col1}]")
 
                 # SECTION DETTES
                 elif dans_section_dettes and code in CODES_ETAT_ECHEANCES_DETTES:
@@ -95,31 +115,31 @@ class EtatEcheancesExtractor(BaseExtractor):
 
                     libelle = CODES_ETAT_ECHEANCES_DETTES[code]
 
-                    # Code VH (Annuité à venir) → index 14
+                    # Code VH (Annuité à venir) → 2ème colonne numérique
                     if code == "VH":
-                        montant_cell = row[14] if len(row) > 14 else None
+                        montant_cell = row[idx_col2] if idx_col2 < len(row) else None
                         montant = nettoyer_montant(montant_cell)
 
                         if montant is not None:
                             donnees.append((libelle, montant))
                             nb_trouves += 1
-                            print(f"   ✓ DETTES - {code} ({libelle}) → {montant} [index 14]")
+                            print(f"   ✓ DETTES - {code} ({libelle}) → {montant} [index {idx_col2}]")
                         else:
                             donnees.append((libelle, 0))
-                            print(f"   ⚠️  DETTES - {code} ({libelle}) → montant non trouvé [index 14]")
+                            print(f"   ⚠️  DETTES - {code} ({libelle}) → montant non trouvé [index {idx_col2}]")
 
-                    # Code VI (Groupe et associés dettes) → index 10
+                    # Code VI (Groupe et associés dettes) → 1ère colonne numérique
                     elif code == "VI":
-                        montant_cell = row[10] if len(row) > 10 else None
+                        montant_cell = row[idx_col1] if idx_col1 < len(row) else None
                         montant = nettoyer_montant(montant_cell)
 
                         if montant is not None:
                             donnees.append((libelle, montant))
                             nb_trouves += 1
-                            print(f"   ✓ DETTES - {code} ({libelle}) → {montant} [index 10]")
+                            print(f"   ✓ DETTES - {code} ({libelle}) → {montant} [index {idx_col1}]")
                         else:
                             donnees.append((libelle, 0))
-                            print(f"   ⚠️  DETTES - {code} ({libelle}) → montant non trouvé [index 10]")
+                            print(f"   ⚠️  DETTES - {code} ({libelle}) → montant non trouvé [index {idx_col1}]")
 
         print(f"\n   📊 Total : {nb_trouves} valeur(s) trouvée(s)")
         return donnees, nb_trouves
