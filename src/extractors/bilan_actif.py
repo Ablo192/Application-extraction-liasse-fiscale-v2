@@ -15,6 +15,7 @@ from src.utils.extraction_fallback import (
     extraire_codes_depuis_texte_fusionne,
     extraire_montants_depuis_texte_fusionne
 )
+from src.utils.extraction_ligne_par_ligne import extraire_actif_ligne_par_ligne
 
 
 class BilanActifExtractor(BaseExtractor):
@@ -82,7 +83,13 @@ class BilanActifExtractor(BaseExtractor):
         return resultats, nb_trouves
 
     def extraire_par_libelles(self, pdf, table):
-        """Extrait le Bilan Actif en cherchant les LIBELLÉS dans le tableau.
+        """Extrait le Bilan Actif en cherchant les LIBELLÉS ligne par ligne.
+
+        Nouvelle approche robuste:
+        - Analyse chaque ligne individuellement
+        - Détecte les colonnes numériques DE CETTE LIGNE
+        - Prend la 3ème colonne numérique de la ligne
+        - Plus robuste face aux décalages de colonnes
 
         Args:
             pdf: Objet PDF (non utilisé ici)
@@ -91,33 +98,10 @@ class BilanActifExtractor(BaseExtractor):
         Returns:
             list: Liste de tuples (libellé, montant)
         """
-        idx_net = self._trouver_colonne_net(table)
-        if idx_net is None:
-            print("   ⚠️ Colonne 'Net' introuvable.")
-            return []
+        print("   → Extraction par LIBELLÉS (méthode ligne par ligne)")
 
-        libelles_normalises = {normaliser_texte(lib): lib for lib in LIBELLES_BILAN_ACTIF.keys()}
-        libelles_trouves = {}
-
-        for row in table:
-            if not row:
-                continue
-
-            libelle_trouve = None
-            for cell in row:
-                if cell:
-                    cell_normalise = normaliser_texte(str(cell).strip())
-                    if cell_normalise in libelles_normalises:
-                        libelle_trouve = libelles_normalises[cell_normalise]
-                        break
-
-            if libelle_trouve:
-                montant_brut = nettoyer_montant(row[idx_net]) if idx_net < len(row) else None
-                montant = montant_brut if montant_brut is not None else 0.0
-                libelles_trouves[libelle_trouve] = montant
-
-        resultats = [(libelle, libelles_trouves.get(libelle, 0)) for libelle in LIBELLES_BILAN_ACTIF.keys()]
-        return resultats
+        # Utiliser la nouvelle logique ligne par ligne
+        return extraire_actif_ligne_par_ligne(table, LIBELLES_BILAN_ACTIF, debug=True)
 
     def _trouver_colonne_net(self, table):
         """Trouve l'index de la colonne 'Net' dans le tableau de l'actif.
