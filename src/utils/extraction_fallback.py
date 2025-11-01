@@ -197,34 +197,57 @@ def extraire_montants_depuis_texte_fusionne(codes_info, index_colonne_montant):
     """
     montants = {}
 
+    print(f"\n   🔍 DEBUG: Extraction des montants depuis texte fusionné...")
+    print(f"   - Index colonne montant: {index_colonne_montant}")
+    print(f"   - Nombre de codes à traiter: {len(codes_info)}")
+
     for code, info in codes_info.items():
         row = info['row_complete']
         ligne_idx = info['ligne_dans_cellule']
 
+        print(f"\n   📌 Traitement code {code}:")
+        print(f"      - Ligne dans cellule fusionnée: {ligne_idx}")
+        print(f"      - Nombre de colonnes dans la ligne: {len(row)}")
+
         # Vérifier si la colonne des montants existe
         if index_colonne_montant >= len(row):
+            print(f"      ❌ Index montant {index_colonne_montant} >= {len(row)} (hors limites)")
             montants[code] = None
             continue
 
         # Récupérer la cellule des montants
         cellule_montants = row[index_colonne_montant]
 
+        print(f"      - Cellule montant brute: '{cellule_montants}'")
+        print(f"      - Type: {type(cellule_montants)}")
+
         if not cellule_montants:
+            print(f"      ⚠️ Cellule montant vide")
             montants[code] = None
             continue
 
         # Si la cellule des montants est aussi fusionnée
         if '\n' in str(cellule_montants):
             lignes_montants = str(cellule_montants).split('\n')
+            print(f"      - Cellule fusionnée détectée: {len(lignes_montants)} lignes")
+            print(f"      - Lignes splittées: {lignes_montants}")
 
             # Essayer de récupérer le montant à la même position que le code
             if ligne_idx < len(lignes_montants):
-                montants[code] = lignes_montants[ligne_idx]
+                montant_extrait = lignes_montants[ligne_idx]
+                montants[code] = montant_extrait
+                print(f"      ✅ Montant extrait: '{montant_extrait}'")
             else:
+                print(f"      ❌ Index {ligne_idx} >= {len(lignes_montants)} lignes de montants")
                 montants[code] = None
         else:
             # Si pas fusionné, utiliser directement
             montants[code] = cellule_montants
+            print(f"      ✅ Montant direct (non fusionné): '{cellule_montants}'")
+
+    print(f"\n   📊 Résumé extraction montants:")
+    print(f"      - Montants extraits: {len([m for m in montants.values() if m is not None])}/{len(montants)}")
+    print(f"      - Montants non-nuls: {len([m for m in montants.values() if m and str(m).strip()])}/{len(montants)}")
 
     return montants
 
