@@ -11,7 +11,7 @@ from src.config.codes_fiscaux import (
     CODES_RENSEIGNEMENTS_DIVERS,
     SEUIL_REUSSITE_CODES_AFFECTATION_RESULTAT
 )
-from src.config.mots_cles import MOTS_CLES_AFFECTATION
+from src.config.mots_cles import MOTS_CLES_AFFECTATION, LIBELLES_AFFECTATION
 from src.utils.pdf_utils import obtenir_colonne_numerique, detecter_colonnes_numeriques
 from src.utils.text_processing import nettoyer_montant
 from src.utils.extraction_fallback import (
@@ -19,6 +19,7 @@ from src.utils.extraction_fallback import (
     extraire_codes_depuis_texte_fusionne,
     extraire_montants_depuis_texte_fusionne
 )
+from src.utils.extraction_ligne_par_ligne import extraire_affectation_ligne_par_ligne
 
 
 class AffectationExtractor(BaseExtractor):
@@ -138,7 +139,7 @@ class AffectationExtractor(BaseExtractor):
         return donnees, nb_trouves
 
     def extraire_par_libelles(self, pdf, table):
-        """Extrait l'Affectation en cherchant les LIBELLÉS (méthode de secours).
+        """Extrait l'Affectation en cherchant les LIBELLÉS (méthode ligne par ligne).
 
         Args:
             pdf: Objet PDF (non utilisé ici)
@@ -147,5 +148,5 @@ class AffectationExtractor(BaseExtractor):
         Returns:
             list: Liste de tuples (libellé, montant)
         """
-        print("   → Extraction par libellés non implémentée pour l'Affectation")
-        return [(self.codes_dict[code], 0) for code in self.codes_dict.keys()]
+        print("   → Extraction par LIBELLÉS (méthode ligne par ligne)")
+        return extraire_affectation_ligne_par_ligne(table, LIBELLES_AFFECTATION, debug=True)

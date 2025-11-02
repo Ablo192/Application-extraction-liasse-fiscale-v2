@@ -11,7 +11,7 @@ from src.config.codes_fiscaux import (
     CODES_ETAT_ECHEANCES_DETTES,
     SEUIL_REUSSITE_CODES_ETAT_ECHEANCES
 )
-from src.config.mots_cles import MOTS_CLES_ETAT_ECHEANCES
+from src.config.mots_cles import MOTS_CLES_ETAT_ECHEANCES, LIBELLES_ETAT_ECHEANCES
 from src.utils.pdf_utils import detecter_section_dettes, obtenir_colonne_numerique, detecter_colonnes_numeriques
 from src.utils.text_processing import nettoyer_montant
 from src.utils.extraction_fallback import (
@@ -19,6 +19,7 @@ from src.utils.extraction_fallback import (
     extraire_codes_depuis_texte_fusionne,
     extraire_montants_depuis_texte_fusionne
 )
+from src.utils.extraction_ligne_par_ligne import extraire_echeances_ligne_par_ligne
 
 
 class EtatEcheancesExtractor(BaseExtractor):
@@ -185,7 +186,7 @@ class EtatEcheancesExtractor(BaseExtractor):
         return donnees, nb_trouves
 
     def extraire_par_libelles(self, pdf, table):
-        """Extrait l'État des échéances en cherchant les LIBELLÉS (méthode de secours).
+        """Extrait l'État des échéances en cherchant les LIBELLÉS (méthode ligne par ligne).
 
         Args:
             pdf: Objet PDF (non utilisé ici)
@@ -194,5 +195,5 @@ class EtatEcheancesExtractor(BaseExtractor):
         Returns:
             list: Liste de tuples (libellé, montant)
         """
-        print("   → Extraction par libellés non implémentée pour l'État des Échéances")
-        return [(self.codes_dict[code], 0) for code in self.codes_dict.keys()]
+        print("   → Extraction par LIBELLÉS (méthode ligne par ligne)")
+        return extraire_echeances_ligne_par_ligne(table, LIBELLES_ETAT_ECHEANCES, debug=True)

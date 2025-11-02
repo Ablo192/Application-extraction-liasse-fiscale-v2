@@ -7,7 +7,7 @@ de liasses fiscales. Le compte de résultat s'étend sur 2 pages.
 
 from src.extractors.base import BaseExtractor
 from src.config.codes_fiscaux import CODES_COMPTE_RESULTAT, SEUIL_REUSSITE_CODES_COMPTE_RESULTAT
-from src.config.mots_cles import MOTS_CLES_COMPTE_RESULTAT
+from src.config.mots_cles import MOTS_CLES_COMPTE_RESULTAT, LIBELLES_COMPTE_RESULTAT
 from src.utils.pdf_utils import obtenir_colonne_numerique, detecter_colonnes_numeriques
 from src.utils.text_processing import nettoyer_montant
 from src.utils.extraction_fallback import (
@@ -15,6 +15,7 @@ from src.utils.extraction_fallback import (
     extraire_codes_depuis_texte_fusionne,
     extraire_montants_depuis_texte_fusionne
 )
+from src.utils.extraction_ligne_par_ligne import extraire_cr_ligne_par_ligne
 
 
 class CompteResultatExtractor(BaseExtractor):
@@ -112,10 +113,10 @@ class CompteResultatExtractor(BaseExtractor):
         return resultats, nb_trouves
 
     def extraire_par_libelles(self, pdf, table=None):
-        """Extrait le Compte de Résultat en cherchant les LIBELLÉS (méthode de secours).
+        """Extrait le Compte de Résultat en cherchant les LIBELLÉS (méthode ligne par ligne).
 
-        Note: Cette méthode est complexe à implémenter sur 2 pages.
-        Pour simplifier, on retourne les données extraites par codes même si partielles.
+        Le Compte de Résultat s'étend sur 2 pages. On traite chaque page séparément
+        puis on fusionne les résultats.
 
         Args:
             pdf: Objet PDF ouvert avec pdfplumber
@@ -124,11 +125,38 @@ class CompteResultatExtractor(BaseExtractor):
         Returns:
             list: Liste de tuples (libellé, montant)
         """
-        print("   → Extraction par libellés non implémentée pour le Compte de Résultat")
-        print("   → Utilisation des données partielles extraites par codes")
+        print("   → Extraction par LIBELLÉS (méthode ligne par ligne sur 2 pages)")
 
-        # Retourner une liste vide avec tous les libellés
-        return [(self.codes_dict[code], 0) for code in self.codes_dict.keys()]
+        resultats_dict = {}
+
+        # ========================================
+        # TRAITER LA PAGE 1
+        # ========================================
+        print("\n   📄 Traitement PAGE 1 - Extraction par libellés ligne par ligne...")
+        cr_page1_index = self._trouver_page_compte_resultat_1(pdf)
+
+        if cr_page1_index != -1:
+            tables_page1 = pdf.pages[cr_page1_index].extract_tables()
+            if tables_page1:
+                table_page1 = tables_page1[0]
+                resultats_page1 = extraire_cr_ligne_par_ligne(table_page1, LIBELLES_COMPTE_RESULTAT, debug=True)
+                resultats_dict.update(resultats_page1)
+
+        # ========================================
+        # TRAITER LA PAGE 2
+        # ========================================
+        print("\n   📄 Traitement PAGE 2 - Extraction par libellés ligne par ligne...")
+        cr_page2_index = self._trouver_page_compte_resultat_2(pdf)
+
+        if cr_page2_index != -1:
+            tables_page2 = pdf.pages[cr_page2_index].extract_tables()
+            if tables_page2:
+                table_page2 = tables_page2[0]
+                resultats_page2 = extraire_cr_ligne_par_ligne(table_page2, LIBELLES_COMPTE_RESULTAT, debug=True)
+                resultats_dict.update(resultats_page2)
+
+        # Convertir en liste de tuples dans l'ordre des libellés
+        return [(libelle, resultats_dict.get(libelle, 0)) for libelle in LIBELLES_COMPTE_RESULTAT.keys()]
 
     def _trouver_page_compte_resultat_1(self, pdf):
         """Trouve la page 1 du Compte de Résultat (Produits et Charges d'exploitation)."""
