@@ -83,6 +83,12 @@ def extraire_par_libelles_ligne_par_ligne(table, libelles_dict, position_colonne
     if debug:
         print(f"\n🔍 Extraction ligne par ligne (position colonne: {position_colonne})")
         print(f"   Libellés à chercher: {len(libelles_dict)}")
+        print(f"\n   🔑 DEBUG: Quelques libellés normalisés attendus:")
+        for i, (lib_norm, lib_orig) in enumerate(list(libelles_normalises.items())[:5]):
+            print(f"      '{lib_norm}' → '{lib_orig}'")
+
+    # Pour debug: collecter les cellules qui ressemblent à des libellés
+    cellules_texte_trouvees = []
 
     for row_idx, row in enumerate(table):
         if not row:
@@ -90,22 +96,39 @@ def extraire_par_libelles_ligne_par_ligne(table, libelles_dict, position_colonne
 
         # Chercher un libellé dans cette ligne
         libelle_trouve = None
-        for cell in row:
+        for col_idx, cell in enumerate(row):
             if not cell:
                 continue
 
-            cell_normalise = normaliser_texte(str(cell).strip())
+            cell_text = str(cell).strip()
+
+            # Pour debug: collecter les cellules texte longues (probablement des libellés)
+            if debug and len(cell_text) > 10 and col_idx < 5:  # Colonnes probables pour libellés
+                cellules_texte_trouvees.append((row_idx, col_idx, cell_text))
+
+            cell_normalise = normaliser_texte(cell_text)
 
             # Correspondance exacte
             if cell_normalise in libelles_normalises:
                 libelle_trouve = libelles_normalises[cell_normalise]
+                if debug:
+                    print(f"\n   ✅ MATCH EXACT - Ligne {row_idx}, Col {col_idx}")
+                    print(f"      Texte: '{cell_text}'")
+                    print(f"      Normalisé: '{cell_normalise}'")
+                    print(f"      Libellé: '{libelle_trouve}'")
                 break
 
             # Correspondance partielle (le libellé contient la cellule ou inverse)
             for lib_norm, lib_orig in libelles_normalises.items():
-                if cell_normalise in lib_norm or lib_norm in cell_normalise:
-                    if len(cell_normalise) > 5:  # Éviter les faux positifs sur des mots courts
+                if len(cell_normalise) > 5:  # Éviter les faux positifs sur des mots courts
+                    if cell_normalise in lib_norm or lib_norm in cell_normalise:
                         libelle_trouve = lib_orig
+                        if debug:
+                            print(f"\n   ⚡ MATCH PARTIEL - Ligne {row_idx}, Col {col_idx}")
+                            print(f"      Texte: '{cell_text}'")
+                            print(f"      Normalisé: '{cell_normalise}'")
+                            print(f"      Contient: '{lib_norm}'")
+                            print(f"      Libellé: '{libelle_trouve}'")
                         break
 
         if libelle_trouve and libelle_trouve not in resultats:
@@ -116,8 +139,6 @@ def extraire_par_libelles_ligne_par_ligne(table, libelles_dict, position_colonne
             resultats[libelle_trouve] = montant if montant is not None else 0.0
 
             if debug:
-                print(f"\n   Ligne {row_idx}:")
-                print(f"      Libellé: {libelle_trouve}")
                 print(f"      Colonnes numériques: {colonnes_num}")
                 if colonnes_num and position_colonne <= len(colonnes_num):
                     idx_utilise = colonnes_num[position_colonne - 1]
@@ -129,6 +150,13 @@ def extraire_par_libelles_ligne_par_ligne(table, libelles_dict, position_colonne
     if debug:
         print(f"\n   📊 Résumé: {len(resultats)}/{len(libelles_dict)} libellés trouvés")
         print(f"   💰 Montants non-nuls: {len([m for m in resultats.values() if m != 0])}")
+
+        if len(resultats) == 0 and cellules_texte_trouvees:
+            print(f"\n   ❌ AUCUN LIBELLÉ TROUVÉ! Voici ce qui est dans le PDF (20 premières cellules texte):")
+            for row_idx, col_idx, texte in cellules_texte_trouvees[:20]:
+                texte_norm = normaliser_texte(texte)
+                print(f"      Ligne {row_idx}, Col {col_idx}: '{texte}'")
+                print(f"         → Normalisé: '{texte_norm}'")
 
     # Ajouter les libellés manquants avec montant 0
     for libelle in libelles_dict.keys():
